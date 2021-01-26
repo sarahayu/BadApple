@@ -1,2 +1,2 @@
 # BadApple
- Bad Apple!! in c++, hopefully in real time
+ Console ouptut in real time
