@@ -151,6 +151,7 @@ int main(int argc, char **argv)
 
 		if (drawNewFrame)
 		{
+			before -= sch::microseconds(dt);
 			int startFrame = frame - numFramesGoThrough;
 
 			for (int i = startFrame; i < frame; i++)
