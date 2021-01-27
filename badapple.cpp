@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <windows.h>
 #include <cstdio>
 #include <thread>
@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 
 	if (!badAppleVid.isOpened())
 	{
-		std::cout << "Could not open file badapple.mp4";
+		std::cout << "Could not open file " << argv[1];
 		return -1;
 	}
 
