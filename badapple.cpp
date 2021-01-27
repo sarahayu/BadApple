@@ -13,22 +13,25 @@
 
 struct Change
 {
-	short x, y;
+	short index;
 	char ch;
 };
 
-typedef long long llong;
-
 void readFrame(cv::Mat &src, std::string &dest, const cv::Size &resize)
 {
-	const static char *CH_LIST = " .=I@";
+	const static std::string CH_LIST = []() {
+		std::ifstream charList("chars.txt");
+		std::string chars;
+		std::getline(charList, chars);
+		return chars;
+	}();
+	const static int CHS = CH_LIST.size() - 1;
 	cv::resize(src, src, resize);
 	auto pix = src.begin<cv::Vec3b>();
 	for (int row = 0, height = resize.height, width = resize.width; row < height; row++)
 	{
 		for (int col = 0; col < width; col++, ++pix)
-			dest.push_back(CH_LIST[(int)cv::mean(*pix)[0] * 4 / 255]);
-		dest += "\n";
+			dest.push_back(CH_LIST[(int)cv::mean(*pix)[0] * CHS / 255]);
 	}
 }
 
@@ -43,7 +46,7 @@ int main(int argc, char **argv)
 	namespace sch = std::chrono;
 	using sc = sch::steady_clock;
 
-	const llong FRAME_DURATION = 1000000 / 15;	// in microseconds
+	const long long FRAME_DURATION = 1e6 / 15;	// in microseconds
 
 	// so debug info won't gunk up console window for preferable console visualizer
 	cv::utils::logging::setLogLevel(cv::utils::logging::LogLevel::LOG_LEVEL_SILENT);
@@ -78,9 +81,9 @@ int main(int argc, char **argv)
 	for (int i = 0; i < FRAME_SKIP; i++)
 		badAppleVid >> vidFrame;
 
+	// populate frame change information
 	std::string lastFrame = firstFrame;
-	// for progress counting
-	int frameCount = 1, lastProgressMod = 0;
+	int frameCount = 1, lastProgressMod = 0;	// for progress counting
 	while (!vidFrame.empty())
 	{
 		changes.push_back(std::vector<Change>());
@@ -91,7 +94,7 @@ int main(int argc, char **argv)
 		auto &thisChanges = changes.back();
 		for (int i = 0; i < thisFrame.length(); i++)
 			if (thisFrame[i] != lastFrame[i])
-				thisChanges.push_back({ (short)(i % (VID_WIDTH_CONSOLE + 1)), (short)(i / (VID_WIDTH_CONSOLE + 1)), thisFrame[i] });
+				thisChanges.push_back({ (short)i, thisFrame[i] });
 
 		lastFrame = thisFrame;
 
@@ -114,15 +117,13 @@ int main(int argc, char **argv)
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 
 	// clear screen
-	DWORD cCharsWritten;
-	CONSOLE_SCREEN_BUFFER_INFO csbi;
-	GetConsoleScreenBufferInfo(hOut, &csbi);
-	FillConsoleOutputCharacter(hOut, (TCHAR)' ', csbi.dwSize.X * csbi.dwSize.Y, { 0, 0 }, &cCharsWritten);
-
-	std::ios_base::sync_with_stdio(false);
-
+	DWORD charsWritten;
+	CONSOLE_SCREEN_BUFFER_INFO consoleSize;
+	GetConsoleScreenBufferInfo(hOut, &consoleSize);
 	SetConsoleCursorPosition(hOut, { 0, 0 });
-	std::cout << firstFrame;
+
+	FillConsoleOutputCharacter(hOut, (TCHAR)' ', consoleSize.dwSize.X * consoleSize.dwSize.Y, { 0, 0 }, &charsWritten);
+	WriteConsoleOutputCharacter(hOut, firstFrame.c_str(), firstFrame.size(), { 0, 0 }, &charsWritten);
 
 	int frame = 0;
 	auto before = sc::now();
@@ -141,8 +142,6 @@ int main(int argc, char **argv)
 		{
 			dt -= FRAME_DURATION;
 
-			SetConsoleCursorPosition(hOut, { 0, 0 });
-
 			numFramesGoThrough++;
 			frame++;
 
@@ -154,16 +153,35 @@ int main(int argc, char **argv)
 			before -= sch::microseconds(dt);
 			int startFrame = frame - numFramesGoThrough;
 
+			std::string buffer = lastFrame;
+
 			for (int i = startFrame; i < frame; i++)
 				for (const auto &change : changes[i])
-				{
-					SetConsoleCursorPosition(hOut, { change.x, change.y });
-					std::cout << change.ch;
-				}
+					buffer[change.index] = change.ch;
+
+			lastFrame = buffer;
+
+			// clear screen completely if console size has changed to avoid fragments after frame
+			auto newSize = consoleSize;
+			GetConsoleScreenBufferInfo(hOut, &newSize);
+			if (newSize.dwSize.X != consoleSize.dwSize.X || newSize.dwSize.Y != consoleSize.dwSize.Y)
+			{
+				consoleSize = newSize;
+				FillConsoleOutputCharacter(hOut, (TCHAR)' ', consoleSize.dwSize.X * consoleSize.dwSize.Y, { 0, 0 }, &charsWritten);
+			}
+
+			const int whitespace = consoleSize.dwSize.X - VID_WIDTH_CONSOLE;
+			if (whitespace > 0)
+			{
+				for (int i = 0; i < VID_HEIGHT_CONSOLE; i++)
+					buffer.insert(VID_WIDTH_CONSOLE * (i + 1) + whitespace * i, whitespace, ' ');
+			}
+
+			WriteConsoleOutputCharacter(hOut, buffer.c_str(), buffer.size(), { 0,0 }, &charsWritten);
 		}
 	}
 
-	SetConsoleCursorPosition(hOut, { 0, 0 });
+	FillConsoleOutputCharacter(hOut, (TCHAR)' ', consoleSize.dwSize.X * consoleSize.dwSize.Y, { 0, 0 }, &charsWritten);
 	std::cout << "The End";
 	std::cin.get();
 
