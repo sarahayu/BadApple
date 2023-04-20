@@ -6,7 +6,7 @@ Plays videos on a Windows console in real time
  - [YUQI - Giant](https://youtu.be/-TTaTj-uSL8)
  
 ## Usage
-Download and unzip `executable.zip`. Run the following command in the same directory as the `BadApple.exe` file, replacing `videoFile` with the name of your video file (I used an `mp4`, I don't know what other formats work) and `consoleWidthInChars` with the amount of characters you want the width of your video frames to be.
+Download the latest `executable.zip` from the [Releases](https://github.com/sarahayu/BadApple/releases) page and unzip it. Run the following command in the same directory as the `BadApple.exe` file, replacing `videoFile` with the name of your video file (I used an `mp4`, I don't know what other formats work) and `consoleWidthInChars` with the amount of characters you want the width of your video frames to be.
 ```bash
 BadApple.exe videoFile consoleWidthInChars
 ```
