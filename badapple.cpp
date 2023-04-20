@@ -10,6 +10,9 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/utils/logger.hpp>
 #include <opencv2/videoio.hpp>
+#include <limits>
+
+const static std::string built_in_charList = " .\'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
 struct Change
 {
@@ -17,10 +20,11 @@ struct Change
 	char ch;
 };
 
-void readFrame(cv::Mat &src, std::string &dest, const cv::Size &resize)
+void readFrame(cv::Mat& src, std::string& dest, const cv::Size& resize)
 {
 	const static std::string CH_LIST = []() {
 		std::ifstream charList("chars.txt");
+		if (charList.fail() || (!charList)) return built_in_charList;
 		std::string chars;
 		std::getline(charList, chars);
 		return chars;
@@ -35,14 +39,36 @@ void readFrame(cv::Mat &src, std::string &dest, const cv::Size &resize)
 	}
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
+	std::string file_path;
+	int ch_width = 0;
 	if (argc <= 1)
 	{
-		std::cout << "Usage: BadApple.exe videoFile consoleWidthInChars";
-		return 0;
+		std::cout << "Enter the full path to the video with its name and extension\n"
+			<< "Example : C:\\Usres\\user_name\\Desktop\\video_file.mp4\n";
+		do {
+			std::getline(std::cin, file_path, '\n');
+		} while (file_path.empty());
+		std::cout << "Now enter the amount of characters you want the width of your video frames to be\n";
+		while (true) 
+		{
+			std::cin >> ch_width;
+			if (std::cin.fail()) {
+				std::cin.clear();
+			}
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+			if (ch_width < 1) {
+				std::cout << "Bad input, try again:\n";
+			}
+			else break;
+		}
 	}
-
+	else
+	{
+		file_path = std::string(argv[1]);
+		ch_width = atoi(argv[2]);
+	}
 	namespace sch = std::chrono;
 	using sc = sch::steady_clock;
 
@@ -51,15 +77,18 @@ int main(int argc, char **argv)
 	// so debug info won't gunk up console window for preferable console visualizer
 	cv::utils::logging::setLogLevel(cv::utils::logging::LogLevel::LOG_LEVEL_SILENT);
 
-	cv::VideoCapture badAppleVid(argv[1]);
+	cv::VideoCapture badAppleVid(file_path);
 
 	if (!badAppleVid.isOpened())
 	{
-		std::cout << "Could not open file " << argv[1];
+		std::cout << "Could not open file at " << file_path
+			<< "\nThis address is probably invalid or the file extension is not supported"
+			<< "\n\nPress Enter to exit . . . ";
+		std::cin.get();
 		return -1;
 	}
 
-	const int CONSOLE_WIDTH_CHAR = atoi(argv[2]);
+	const int CONSOLE_WIDTH_CHAR = ch_width;
 	const int VID_WIDTH = (int)badAppleVid.get(cv::CAP_PROP_FRAME_WIDTH),
 		VID_HEIGHT = (int)badAppleVid.get(cv::CAP_PROP_FRAME_HEIGHT),
 		VID_WIDTH_CONSOLE = CONSOLE_WIDTH_CHAR,
@@ -68,6 +97,12 @@ int main(int argc, char **argv)
 		TOTAL_FRAMES = (int)badAppleVid.get(cv::CAP_PROP_FRAME_COUNT) / FRAME_SKIP;
 	const auto CONSOLE_FRAME_SIZE = cv::Size(VID_WIDTH_CONSOLE, VID_HEIGHT_CONSOLE);
 
+	if (VID_WIDTH_CONSOLE < 1 || VID_HEIGHT_CONSOLE < 1) {
+		std::cout << "\nThe program cannot play videos this small\n\n"
+			<< "Press Enter to exit . . . ";
+		std::cin.get();
+		return -1;
+	}
 	//badAppleVid.set(cv::CAP_PROP_POS_FRAMES, 60 * 30);
 
 	std::vector<std::vector<Change>> changes;
@@ -91,7 +126,7 @@ int main(int argc, char **argv)
 		std::string thisFrame;
 		readFrame(vidFrame, thisFrame, CONSOLE_FRAME_SIZE);
 
-		auto &thisChanges = changes.back();
+		auto& thisChanges = changes.back();
 		for (int i = 0; i < thisFrame.length(); i++)
 			if (thisFrame[i] != lastFrame[i])
 				thisChanges.push_back({ (short)i, thisFrame[i] });
@@ -156,7 +191,7 @@ int main(int argc, char **argv)
 			std::string buffer = lastFrame;
 
 			for (int i = startFrame; i < frame; i++)
-				for (const auto &change : changes[i])
+				for (const auto& change : changes[i])
 					buffer[change.index] = change.ch;
 
 			lastFrame = buffer;
